@@ -1,0 +1,52 @@
+name: Bootstrap reviewed LabelFix source
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/bootstrap-source.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download version-pinned source archive
+        run: |
+          curl --fail --location --retry 3 'https://media.base44.com/files/public/6ad4dccf80479df0bf4bb014/38cbafe9f_LabelFix4x6-SignPath-and-Microsoft-Store-Release-Kit.zip' -o reviewed-kit.zip
+          echo 'efd7cba675930cee6e612b96c5ba96a86f33e561763b9b4915932f4329a030f4  reviewed-kit.zip' | sha256sum --check
+      - name: Import tracked source files, excluding caches and test labels
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+          base=Path('LabelFix4x6_Public_Release_Kit')
+          with zipfile.ZipFile('reviewed-kit.zip') as z:
+              files=0
+              for i in z.infolist():
+                  p=Path(i.filename)
+                  if i.is_dir() or not p.is_relative_to(base):
+                      continue
+                  rel=p.relative_to(base)
+                  if rel.is_absolute() or '..' in rel.parts or '__pycache__' in rel.parts or p.suffix in ('.pyc','.pdf'):
+                      continue
+                  dest=Path.cwd() / rel
+                  dest.parent.mkdir(parents=True,exist_ok=True)
+                  dest.write_bytes(z.read(i))
+                  files+=1
+              print(f'Imported {files} source files')
+          for f in ['label_app.py','label_core.py','LICENSE','README.md','tests/test_label_core.py','docs/SIGNPATH_APPLICATION_DRAFT.md','.github/workflows/windows-portable-and-msix.yml']:
+              assert Path(f).is_file(), f'Missing required file {f}'
+          PY
+          rm -f reviewed-kit.zip
+      - name: Commit reviewed v1.2.1 code to public source repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No source changes'
+          else
+            git commit -m "Import reviewed LabelFix 4x6 v1.2.1 source and release tooling"
+            git push origin HEAD:main
+          fi
