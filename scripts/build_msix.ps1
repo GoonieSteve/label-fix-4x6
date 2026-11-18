@@ -2,6 +2,7 @@ param(
     [Parameter(Mandatory=$true)][string]$IdentityName,
     [Parameter(Mandatory=$true)][string]$Publisher,
     [string]$PublisherDisplayName='Keys Web & IT',
+    [string]$PackageDisplayName='LabelFix 4×6',
     [string]$Version='1.2.1.0',
     [switch]$StoreSubmission
 )
@@ -9,6 +10,7 @@ $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $exeDir=Join-Path $root 'dist/LabelFix4x6'
 if (!(Test-Path (Join-Path $exeDir 'LabelFix4x6.exe'))) { throw 'First run python setup_cxfreeze.py build_exe to generate dist/LabelFix4x6.' }
+if ([string]::IsNullOrWhiteSpace($PackageDisplayName)) { throw 'Package display name must not be empty' }
 if ($StoreSubmission -and ($Publisher -match 'Preview|TEMP|TEST|Placeholder' -or $IdentityName -match 'PREVIEW|TEMP|TEST|Placeholder')) {
     throw 'Store production mode requires EXACT Name and Publisher from Partner Center > App identity.'
 }
@@ -21,7 +23,7 @@ Copy-Item (Join-Path $exeDir '*') -Destination $stage -Recurse -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $stage 'Assets') | Out-Null
 Copy-Item (Join-Path $root 'branding/store/*.png') (Join-Path $stage 'Assets')
 function E([string]$value){ return [System.Security.SecurityElement]::Escape($value) }
-$name=E $IdentityName; $pub=E $Publisher; $display=E $PublisherDisplayName; $ver=E $Version
+$name=E $IdentityName; $pub=E $Publisher; $display=E $PublisherDisplayName; $appName=E $PackageDisplayName; $ver=E $Version
 $manifest=@"
 <?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -31,7 +33,7 @@ $manifest=@"
          IgnorableNamespaces="uap uap10 rescap">
   <Identity Name="$name" Publisher="$pub" Version="$ver" ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>LabelFix 4x6</DisplayName>
+    <DisplayName>$appName</DisplayName>
     <PublisherDisplayName>$display</PublisherDisplayName>
     <Description>Local shipping label PDF converter by Keys Web &amp; IT</Description>
     <Logo>Assets\StoreLogo.png</Logo>
@@ -40,7 +42,7 @@ $manifest=@"
   <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" /></Dependencies>
   <Applications>
     <Application Id="LabelFix4x6" Executable="LabelFix4x6.exe" uap10:RuntimeBehavior="packagedClassicApp" uap10:TrustLevel="mediumIL">
-      <uap:VisualElements DisplayName="LabelFix 4x6" Description="Convert PDF shipping labels to 4x6"
+      <uap:VisualElements DisplayName="$appName" Description="Convert PDF shipping labels to 4x6"
         Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" BackgroundColor="#FFFFFF" />
     </Application>
   </Applications>
