@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "package_identity_name": "KeysWebIT.LabelFix46",
+  "package_identity_publisher": "CN=E5E5C985-5FC9-40EB-9B10-B74DF35E7FC1",
+  "publisher_display_name": "KeysWebIT",
+  "package_family_name": "KeysWebIT.LabelFix46_j9nta6j9hbm8t",
+  "store_id": "9NHZHC39HTZ4",
+  "msix_version": "1.2.1.0",
+  "notice": "Package SID and Store authentication secrets are not needed for building an MSIX. This file contains only public-facing app identity values; policy and publisher-account eligibility must be resolved before submission."
+}
