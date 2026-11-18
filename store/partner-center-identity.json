@@ -6,5 +6,6 @@
   "package_family_name": "KeysWebIT.LabelFix46_j9nta6j9hbm8t",
   "store_id": "9NHZHC39HTZ4",
   "msix_version": "1.2.1.0",
-  "notice": "Package SID and Store authentication secrets are not needed for building an MSIX. This file contains only public-facing app identity values; policy and publisher-account eligibility must be resolved before submission."
+  "notice": "Package SID and Store authentication secrets are not needed for building an MSIX. This file contains only public-facing app identity values; policy and publisher-account eligibility must be resolved before submission.",
+  "reserved_display_name": "LabelFix 4×6"
 }
