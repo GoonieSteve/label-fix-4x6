@@ -1,0 +1,88 @@
+name: Windows Portable and Microsoft Store MSIX
+on:
+  workflow_dispatch:
+    inputs:
+      identity_name:
+        description: 'Exact Partner Center Package Identity Name (empty for preview)'
+        required: false
+        type: string
+        default: ''
+      publisher:
+        description: 'Exact Partner Center Publisher distinguished name (empty for preview)'
+        required: false
+        type: string
+        default: ''
+      publisher_display_name:
+        description: 'Exact Partner Center publisher display name; use an individual name for Individual accounts'
+        required: false
+        type: string
+        default: ''
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies and test PDF conversion
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt 'cx_Freeze>=8,<9' pillow
+          if ($LASTEXITCODE -ne 0) { throw 'Dependencies failed' }
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed' }
+      - name: Check official conch artwork
+        shell: pwsh
+        run: |
+          python scripts/brand_assets.py
+          if ($LASTEXITCODE -ne 0) { throw 'Branding SHA-256 mismatch' }
+      - name: Compile and smoke test Windows EXE
+        shell: pwsh
+        run: |
+          python setup_cxfreeze.py build_exe
+          if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
+          if (!(Test-Path dist/LabelFix4x6/LabelFix4x6.exe)) { throw 'Missing exe' }
+          foreach ($doc in @('README.md','LICENSE','THIRD_PARTY_NOTICES.md','PRIVACY.md','SECURITY.md','CHANGELOG.md')) { Copy-Item $doc dist/LabelFix4x6/ }
+          $p=Start-Process -FilePath (Resolve-Path dist/LabelFix4x6/LabelFix4x6.exe).Path -PassThru
+          Start-Sleep -Seconds 4
+          $p.Refresh()
+          if ($p.HasExited) { throw "GUI exited early with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id -Force
+      - name: Prepare unsigned MSIX with Partner Center identity when supplied
+        shell: pwsh
+        env:
+          ID_NAME: ${{ inputs.identity_name }}
+          ID_PUBLISHER: ${{ inputs.publisher }}
+          DISPLAY_NAME: ${{ inputs.publisher_display_name }}
+        run: |
+          $name=$env:ID_NAME
+          $publisher=$env:ID_PUBLISHER
+          $display=$env:DISPLAY_NAME
+          $production=(![string]::IsNullOrWhiteSpace($name) -and ![string]::IsNullOrWhiteSpace($publisher) -and ![string]::IsNullOrWhiteSpace($display))
+          if (!$production) {
+            $name='KeysWebIT.LabelFix4x6.PREVIEW'
+            $publisher='CN=Preview-Publisher-Not-For-Store'
+            $display='Preview only'
+          }
+          & './scripts/build_msix.ps1' -IdentityName $name -Publisher $publisher -PublisherDisplayName $display -StoreSubmission:$production
+          if ($LASTEXITCODE -ne 0) { throw 'MSIX packaging failed' }
+          if ($production) { Write-Host 'Package remains unsigned. Partner Center certification is required.' }
+      - name: Upload portable release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: LabelFix4x6-portable-x64-UNSIGNED
+          path: dist/LabelFix4x6/
+          if-no-files-found: error
+      - name: Upload unsigned MSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: LabelFix4x6-Store-MSIX-UNSIGNED
+          path: dist/*.msix
+          if-no-files-found: error
