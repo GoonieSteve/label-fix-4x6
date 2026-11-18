@@ -1,0 +1,23 @@
+LabelFix 4x6 by Keys Web & IT — Windows portable version 1.2.1
+=================================================================
+
+NO PYTHON REQUIRED for the Windows portable EXE.
+
+1. Right-click LabelFix4x6-Windows-portable-v1.2.1.zip and choose Extract All.
+2. Open the LabelFix4x6 folder.
+3. Double-click LabelFix4x6.exe.
+4. Click Choose PDF(s) to convert or Start watching Downloads.
+5. Find results in Downloads\LabelFix_4x6_Labels.
+
+Optional direct printing:
+- Install SumatraPDF from https://www.sumatrapdfreader.org/
+- In the app, select your printer and check Print automatically after conversion.
+- Print one label manually first; inspect/scan its barcode before using auto-print.
+
+If you get a missing DLL or runtime file, make sure you extracted the WHOLE
+portable ZIP, not just the .exe. Keep _internal beside LabelFix4x6.exe.
+
+Free / open source (AGPL-3.0-only). Licensed source code is distributed
+alongside the binary; see README.md and LICENSE.
+
+Independent utility, not endorsed by any printer brand, carrier, or marketplace.
