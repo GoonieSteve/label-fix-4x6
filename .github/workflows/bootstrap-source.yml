@@ -28,14 +28,14 @@ jobs:
                   if i.is_dir() or not p.is_relative_to(base):
                       continue
                   rel=p.relative_to(base)
-                  if rel.is_absolute() or '..' in rel.parts or '__pycache__' in rel.parts or p.suffix in ('.pyc','.pdf'):
+                  if rel.is_absolute() or '..' in rel.parts or '__pycache__' in rel.parts or rel.as_posix().startswith('.github/workflows/') or p.suffix in ('.pyc','.pdf'):
                       continue
                   dest=Path.cwd() / rel
                   dest.parent.mkdir(parents=True,exist_ok=True)
                   dest.write_bytes(z.read(i))
                   files+=1
               print(f'Imported {files} source files')
-          for f in ['label_app.py','label_core.py','LICENSE','README.md','tests/test_label_core.py','docs/SIGNPATH_APPLICATION_DRAFT.md','.github/workflows/windows-portable-and-msix.yml']:
+          for f in ['label_app.py','label_core.py','LICENSE','README.md','tests/test_label_core.py','docs/SIGNPATH_APPLICATION_DRAFT.md']:
               assert Path(f).is_file(), f'Missing required file {f}'
           PY
           rm -f reviewed-kit.zip
