@@ -71,10 +71,10 @@ jobs:
           [xml]$manifest=Get-Content 'dist/msix-manifest-check/AppxManifest.xml' -Raw
           $idNode=$manifest.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Identity']")
           $dispNode=$manifest.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Properties']/*[local-name()='PublisherDisplayName']")
-          if ($idNode.Name -cne $name -or $idNode.Publisher -cne $publisher -or $dispNode.InnerText -cne $display) {
-            throw "Identity mismatch: $($idNode.Name) / $($idNode.Publisher) / $($dispNode.InnerText)"
+          if ($idNode.GetAttribute('Name') -cne $name -or $idNode.GetAttribute('Publisher') -cne $publisher -or $dispNode.InnerText -cne $display) {
+            throw "Identity mismatch: $($idNode.GetAttribute('Name')) / $($idNode.GetAttribute('Publisher')) / $($dispNode.InnerText)"
           }
-          if ($idNode.Version -cne $cfg.msix_version) { throw 'Package version mismatch' }
+          if ($idNode.GetAttribute('Version') -cne $cfg.msix_version) { throw 'Package version mismatch' }
           if (!(Test-Path 'dist/msix-manifest-check/LabelFix4x6.exe')) { throw 'No executable in built MSIX' }
           if (!(Test-Path 'dist/msix-manifest-check/Assets/StoreLogo.png')) { throw 'Store logo missing' }
           Write-Host 'Confirmed Partner Center identity:' $name $publisher $display
