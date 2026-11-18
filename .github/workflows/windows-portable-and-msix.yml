@@ -1,23 +1,16 @@
 name: Windows Portable and Microsoft Store MSIX
 on:
   workflow_dispatch:
-    inputs:
-      identity_name:
-        description: 'Exact Partner Center Package Identity Name (empty for preview)'
-        required: false
-        type: string
-        default: ''
-      publisher:
-        description: 'Exact Partner Center Publisher distinguished name (empty for preview)'
-        required: false
-        type: string
-        default: ''
-      publisher_display_name:
-        description: 'Exact Partner Center publisher display name; use an individual name for Individual accounts'
-        required: false
-        type: string
-        default: ''
   push:
+    branches: [main]
+    paths:
+      - 'store/partner-center-identity.json'
+      - '.github/workflows/windows-portable-and-msix.yml'
+      - 'scripts/build_msix.ps1'
+      - 'setup_cxfreeze.py'
+      - 'label_app.py'
+      - 'label_core.py'
+      - 'requirements.txt'
     tags: ['v*']
 permissions:
   contents: read
@@ -55,25 +48,39 @@ jobs:
           $p.Refresh()
           if ($p.HasExited) { throw "GUI exited early with code $($p.ExitCode)" }
           Stop-Process -Id $p.Id -Force
-      - name: Prepare unsigned MSIX with Partner Center identity when supplied
+      - name: Build and verify MSIX against reserved Microsoft Store identity
         shell: pwsh
-        env:
-          ID_NAME: ${{ inputs.identity_name }}
-          ID_PUBLISHER: ${{ inputs.publisher }}
-          DISPLAY_NAME: ${{ inputs.publisher_display_name }}
         run: |
-          $name=$env:ID_NAME
-          $publisher=$env:ID_PUBLISHER
-          $display=$env:DISPLAY_NAME
-          $production=(![string]::IsNullOrWhiteSpace($name) -and ![string]::IsNullOrWhiteSpace($publisher) -and ![string]::IsNullOrWhiteSpace($display))
-          if (!$production) {
-            $name='KeysWebIT.LabelFix4x6.PREVIEW'
-            $publisher='CN=Preview-Publisher-Not-For-Store'
-            $display='Preview only'
-          }
-          & './scripts/build_msix.ps1' -IdentityName $name -Publisher $publisher -PublisherDisplayName $display -StoreSubmission:$production
+          $ErrorActionPreference='Stop'
+          $cfg=Get-Content './store/partner-center-identity.json' -Raw | ConvertFrom-Json
+          $name=$cfg.package_identity_name.Trim()
+          $publisher=$cfg.package_identity_publisher.Trim()
+          $display=$cfg.publisher_display_name.Trim()
+          if ($name -ne 'KeysWebIT.LabelFix46') { throw 'Wrong reserved package identity name' }
+          if ($publisher -ne 'CN=E5E5C985-5FC9-40EB-9B10-B74DF35E7FC1') { throw 'Wrong Store publisher DN' }
+          if ($display -ne 'KeysWebIT') { throw 'Wrong reserved publisher display name' }
+          if ($cfg.store_id -ne '9NHZHC39HTZ4') { throw 'Wrong Store product ID' }
+          if ($cfg.package_family_name -ne 'KeysWebIT.LabelFix46_j9nta6j9hbm8t') { throw 'Wrong package family name' }
+          & './scripts/build_msix.ps1' -IdentityName $name -Publisher $publisher -PublisherDisplayName $display -Version $cfg.msix_version -StoreSubmission
           if ($LASTEXITCODE -ne 0) { throw 'MSIX packaging failed' }
-          if ($production) { Write-Host 'Package remains unsigned. Partner Center certification is required.' }
+          $packageFile=Join-Path 'dist' "LabelFix4x6-Store-$($cfg.msix_version)-UNSIGNED.msix"
+          if (!(Test-Path $packageFile)) { throw "MSIX output missing: $packageFile" }
+          $makeappx=Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\MakeAppx.exe" -ErrorAction Stop | Sort-Object FullName -Descending | Select-Object -First 1
+          & $makeappx.FullName unpack /o /p $packageFile /d 'dist/msix-manifest-check'
+          if ($LASTEXITCODE -ne 0) { throw 'MSIX unpack verification failed' }
+          [xml]$manifest=Get-Content 'dist/msix-manifest-check/AppxManifest.xml' -Raw
+          $idNode=$manifest.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Identity']")
+          $dispNode=$manifest.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Properties']/*[local-name()='PublisherDisplayName']")
+          if ($idNode.Name -cne $name -or $idNode.Publisher -cne $publisher -or $dispNode.InnerText -cne $display) {
+            throw "Identity mismatch: $($idNode.Name) / $($idNode.Publisher) / $($dispNode.InnerText)"
+          }
+          if ($idNode.Version -cne $cfg.msix_version) { throw 'Package version mismatch' }
+          if (!(Test-Path 'dist/msix-manifest-check/LabelFix4x6.exe')) { throw 'No executable in built MSIX' }
+          if (!(Test-Path 'dist/msix-manifest-check/Assets/StoreLogo.png')) { throw 'Store logo missing' }
+          Write-Host 'Confirmed Partner Center identity:' $name $publisher $display
+          Write-Host "Store ID: $($cfg.store_id) | PFN: $($cfg.package_family_name)"
+          Get-FileHash $packageFile -Algorithm SHA256 | Format-List
+          Write-Host 'Ready for Partner Center upload testing, UNSIGNED; not intended for direct download or sideload.'
       - name: Upload portable release candidate
         uses: actions/upload-artifact@v4
         with:
