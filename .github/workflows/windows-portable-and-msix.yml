@@ -56,12 +56,14 @@ jobs:
           $name=$cfg.package_identity_name.Trim()
           $publisher=$cfg.package_identity_publisher.Trim()
           $display=$cfg.publisher_display_name.Trim()
+          $reservedName=$cfg.reserved_display_name.Trim()
           if ($name -ne 'KeysWebIT.LabelFix46') { throw 'Wrong reserved package identity name' }
           if ($publisher -ne 'CN=E5E5C985-5FC9-40EB-9B10-B74DF35E7FC1') { throw 'Wrong Store publisher DN' }
           if ($display -ne 'KeysWebIT') { throw 'Wrong reserved publisher display name' }
+          if ($reservedName -cne 'LabelFix 4×6') { throw "Unexpected reserved name: $reservedName" }
           if ($cfg.store_id -ne '9NHZHC39HTZ4') { throw 'Wrong Store product ID' }
           if ($cfg.package_family_name -ne 'KeysWebIT.LabelFix46_j9nta6j9hbm8t') { throw 'Wrong package family name' }
-          & './scripts/build_msix.ps1' -IdentityName $name -Publisher $publisher -PublisherDisplayName $display -Version $cfg.msix_version -StoreSubmission
+          & './scripts/build_msix.ps1' -IdentityName $name -Publisher $publisher -PublisherDisplayName $display -PackageDisplayName $reservedName -Version $cfg.msix_version -StoreSubmission
           if ($LASTEXITCODE -ne 0) { throw 'MSIX packaging failed' }
           $packageFile=Join-Path 'dist' "LabelFix4x6-Store-$($cfg.msix_version)-UNSIGNED.msix"
           if (!(Test-Path $packageFile)) { throw "MSIX output missing: $packageFile" }
@@ -71,9 +73,13 @@ jobs:
           [xml]$manifest=Get-Content 'dist/msix-manifest-check/AppxManifest.xml' -Raw
           $idNode=$manifest.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Identity']")
           $dispNode=$manifest.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Properties']/*[local-name()='PublisherDisplayName']")
+          $appNameNode=$manifest.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Properties']/*[local-name()='DisplayName']")
+          $visualNode=$manifest.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Applications']/*[local-name()='Application']/*[local-name()='VisualElements']")
           if ($idNode.GetAttribute('Name') -cne $name -or $idNode.GetAttribute('Publisher') -cne $publisher -or $dispNode.InnerText -cne $display) {
             throw "Identity mismatch: $($idNode.GetAttribute('Name')) / $($idNode.GetAttribute('Publisher')) / $($dispNode.InnerText)"
           }
+          if ($appNameNode.InnerText -cne $reservedName) { throw "MSIX app name mismatch: $($appNameNode.InnerText)" }
+          if ($visualNode.GetAttribute('DisplayName') -cne $reservedName) { throw "MSIX tile name mismatch: $($visualNode.GetAttribute('DisplayName'))" }
           if ($idNode.GetAttribute('Version') -cne $cfg.msix_version) { throw 'Package version mismatch' }
           if (!(Test-Path 'dist/msix-manifest-check/LabelFix4x6.exe')) { throw 'No executable in built MSIX' }
           if (!(Test-Path 'dist/msix-manifest-check/Assets/StoreLogo.png')) { throw 'Store logo missing' }
